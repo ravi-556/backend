@@ -8,15 +8,15 @@ echo "🔧 Installing Ruby, PostgreSQL, Nginx, and dependencies..."
 sudo dnf install -y ruby ruby-devel gcc make redhat-rpm-config nginx
 
 echo "📦 Enabling PostgreSQL module and installing packages..."
-sudo dnf module enable postgresql:15 -y
-sudo dnf install -y postgresql postgresql-server postgresql-devel
+sudo dnf install -y postgresql15 postgresql15-server postgresql15-devel
 
-if [ ! -d "/var/lib/pgsql/data/base" ]; then
-  sudo /usr/bin/postgresql-setup --initdb
+if [ ! -d "/var/lib/pgsql/15/data/base" ]; then
+  echo "🔧 Initializing PostgreSQL 15 database..."
+  sudo /usr/pgsql-15/bin/postgresql-15-setup initdb
 fi
 
-sudo systemctl enable postgresql
-sudo systemctl start postgresql
+sudo systemctl enable postgresql-15
+sudo systemctl start postgresql-15
 
 
 echo "💎 Installing bundler..."
