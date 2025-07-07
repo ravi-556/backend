@@ -2,10 +2,19 @@
 set -euo pipefail
 
 echo "📦 Updating packages..."
-sudo apt update
+sudo dnf update -y
 
-echo "🔧 Installing Ruby, Puma, Bundler, PostgreSQL, and Nginx..."
-sudo apt install -y ruby ruby-dev build-essential libpq-dev nginx postgresql postgresql-contrib nginx
+echo "🔧 Installing Ruby, PostgreSQL, Nginx, and dependencies..."
+sudo dnf install -y ruby ruby-devel gcc make redhat-rpm-config \
+  postgresql postgresql-server postgresql-devel nginx
+
+echo "🚀 Initializing and starting PostgreSQL if needed..."
+if [ ! -d "/var/lib/pgsql/data/base" ]; then
+  sudo /usr/bin/postgresql-setup --initdb
+fi
+
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
 
 echo "💎 Installing bundler..."
 if ! command -v bundle &> /dev/null; then
@@ -28,7 +37,7 @@ fi
 # Check and create DB if not exists
 if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='user_data'" | grep -q 1; then
   echo "🗄️ Creating PostgreSQL database: user_data"
-  sudo -u postgres psql -c "CREATE DATABASE appdb OWNER backend;"
+  sudo -u postgres psql -c "CREATE DATABASE user_data OWNER backend;"
 else
   echo "✅ PostgreSQL database 'user_data' already exists"
 fi
@@ -51,7 +60,7 @@ pkill -f puma || true
 puma -C puma.rb
 
 echo "🌐 Configuring Nginx as reverse proxy..."
-sudo tee /etc/nginx/sites-available/myapp > /dev/null <<EOF
+sudo tee /etc/nginx/conf.d/myapp.conf > /dev/null <<EOF
 server {
     listen 80;
     server_name localhost;
@@ -66,7 +75,10 @@ server {
 }
 EOF
 
-sudo ln -sf /etc/nginx/sites-available/myapp /etc/nginx/sites-enabled/default
+echo "🌀 Removing default Nginx config if exists..."
+sudo rm -f /etc/nginx/conf.d/default.conf || true
+
+echo "🔄 Restarting Nginx..."
 sudo nginx -t && sudo systemctl restart nginx
 
-echo "✅ Deployment complete. App is live at http://localhost"
+echo "✅ Deployment complete. App is live at http://<EC2-PUBLIC-IP>"
