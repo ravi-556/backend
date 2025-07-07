@@ -1,33 +1,34 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "📦 Updating packages..."
+echo "📦 Updating system packages..."
 sudo dnf update -y
 
-echo "🔧 Installing Ruby, PostgreSQL 15, Nginx, and dependencies..."
+echo "🔧 Installing dependencies: Ruby, PostgreSQL 15, Nginx..."
 sudo dnf install -y ruby ruby-devel gcc make redhat-rpm-config \
   postgresql15 postgresql15-server postgresql15-devel nginx
 
-echo "💎 Installing bundler..."
+echo "💎 Installing bundler (if not present)..."
 if ! command -v bundle &> /dev/null; then
   sudo gem install bundler
 fi
 
-echo "📁 Installing Ruby gems to vendor/bundle (project local)..."
-export BUNDLE_PATH=vendor/bundle
+echo "📁 Installing Ruby gems to vendor/bundle..."
+bundle config set --local path 'vendor/bundle'
 bundle install
-
 
 PGDATA_DIR="/var/lib/pgsql/15/data"
 
-echo "🚀 Initializing PostgreSQL 15 manually..."
-if [ ! -d "$PGDATA_DIR/base" ]; then
+echo "🚀 Initializing PostgreSQL 15..."
+if [ ! -f "$PGDATA_DIR/PG_VERSION" ]; then
+  echo "📂 Running initdb as postgres user"
+  cd /tmp
   sudo -u postgres /usr/bin/initdb -D "$PGDATA_DIR"
 else
-  echo "✅ PostgreSQL already initialized"
+  echo "✅ PostgreSQL data directory already initialized"
 fi
 
-echo "⚙️ Creating custom systemd service for PostgreSQL 15..."
+echo "⚙️ Setting up custom systemd service for PostgreSQL 15..."
 sudo tee /etc/systemd/system/postgresql15-custom.service > /dev/null <<EOF
 [Unit]
 Description=PostgreSQL 15 Custom Database Server
@@ -50,20 +51,19 @@ sudo systemctl enable postgresql15-custom
 sudo systemctl start postgresql15-custom
 
 echo "🛠️ Creating PostgreSQL user and database..."
-# Create user 'backend' and database 'appdb' only if not exists
 if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='backend'" | grep -q 1; then
   sudo -u postgres psql -c "CREATE USER backend WITH PASSWORD 'securepass';"
 else
   echo "✅ User 'backend' already exists"
 fi
 
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='user_data'" | grep -q 1; then
-  sudo -u postgres psql -c "CREATE DATABASE user_data OWNER backend;"
+if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='appdb'" | grep -q 1; then
+  sudo -u postgres psql -c "CREATE DATABASE appdb OWNER backend;"
 else
-  echo "✅ Database 'user_data' already exists"
+  echo "✅ Database 'appdb' already exists"
 fi
 
-echo "📄 Ensuring Puma config exists..."
+echo "📄 Ensuring Puma config file exists..."
 if [ ! -f puma.rb ]; then
   cat > puma.rb <<'EOF'
 port ENV.fetch("PORT") { 9292 }
@@ -73,14 +73,14 @@ stdout_redirect 'puma.log', 'puma_err.log', true
 EOF
   echo "✅ Created puma.rb"
 else
-  echo "✅ Puma config already exists"
+  echo "✅ puma.rb already exists"
 fi
 
-echo "🚀 Starting Puma in daemon mode..."
+echo "🚀 Starting Puma (daemon mode)..."
 pkill -f puma || true
-puma -C puma.rb
+bundle exec puma -C puma.rb
 
-echo "🌐 Configuring Nginx as reverse proxy..."
+echo "🌐 Setting up Nginx reverse proxy..."
 sudo tee /etc/nginx/conf.d/myapp.conf > /dev/null <<EOF
 server {
     listen 80;
@@ -97,6 +97,7 @@ server {
 EOF
 
 sudo rm -f /etc/nginx/conf.d/default.conf || true
-sudo nginx -t && sudo systemctl restart nginx
+sudo nginx -t && sudo systemctl enable nginx && sudo systemctl restart nginx
 
-echo "✅ Deployment complete. Visit your app at http://<your-ec2-ip>"
+echo "✅ Deployment completed successfully!"
+echo "🔗 Visit: http://<your-ec2-public-ip>"
