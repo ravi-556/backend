@@ -5,16 +5,19 @@ echo "📦 Updating packages..."
 sudo dnf update -y
 
 echo "🔧 Installing Ruby, PostgreSQL, Nginx, and dependencies..."
-sudo dnf install -y ruby ruby-devel gcc make redhat-rpm-config \
-  postgresql postgresql-server postgresql-devel nginx
+sudo dnf install -y ruby ruby-devel gcc make redhat-rpm-config nginx
 
-echo "🚀 Initializing and starting PostgreSQL if needed..."
+echo "📦 Enabling PostgreSQL module and installing packages..."
+sudo dnf module enable postgresql:15 -y
+sudo dnf install -y postgresql postgresql-server postgresql-devel
+
 if [ ! -d "/var/lib/pgsql/data/base" ]; then
   sudo /usr/bin/postgresql-setup --initdb
 fi
 
 sudo systemctl enable postgresql
 sudo systemctl start postgresql
+
 
 echo "💎 Installing bundler..."
 if ! command -v bundle &> /dev/null; then
