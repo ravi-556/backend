@@ -17,22 +17,22 @@ echo "📁 Installing Ruby gems to vendor/bundle..."
 bundle config set --local path 'vendor/bundle'
 bundle install
 
-
 echo "📄 Ensuring Puma config file exists..."
 if [ ! -f puma.rb ]; then
   cat > puma.rb <<'EOF'
-    port ENV.fetch("PORT") { 9292 }
-    environment ENV.fetch("RACK_ENV") { "development" }
+port ENV.fetch("PORT") { 9292 }
+environment ENV.fetch("RACK_ENV") { "development" }
 EOF
   echo "✅ Created puma.rb"
 else
   echo "✅ puma.rb already exists"
 fi
 
-echo "🚀 Starting Puma (daemon mode)..."
+echo "🚀 Starting Puma in background using nohup..."
 pkill -f puma || true
-bundle exec puma -C puma.rb --daemon --redirect-stdout puma.log --redirect-stderr puma_err.log
-echo "✅ Puma started. Logs: puma.log, puma_err.log"
+nohup bundle exec puma -C puma.rb > puma.log 2> puma_err.log &
+echo "✅ Puma started (PID: $!)"
+
 
 echo "🌐 Setting up Nginx reverse proxy..."
 sudo tee /etc/nginx/conf.d/myapp.conf > /dev/null <<EOF
