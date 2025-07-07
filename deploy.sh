@@ -12,7 +12,7 @@ sudo dnf install -y postgresql15 postgresql15-server postgresql15-devel
 
 echo "🚀 Initializing PostgreSQL 15 manually..."
 if [ ! -d "/var/lib/pgsql/15/data/base" ]; then
-  sudo -u postgres /usr/pgsql-15/bin/initdb -D /var/lib/pgsql/15/data
+  sudo -u postgres /usr/bin/initdb -D /var/lib/pgsql/15/data
 else
   echo "✅ PostgreSQL 15 already initialized"
 fi
