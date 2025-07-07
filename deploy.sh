@@ -10,9 +10,11 @@ sudo dnf install -y ruby ruby-devel gcc make redhat-rpm-config nginx
 echo "📦 Enabling PostgreSQL module and installing packages..."
 sudo dnf install -y postgresql15 postgresql15-server postgresql15-devel
 
+echo "🚀 Initializing PostgreSQL 15 manually..."
 if [ ! -d "/var/lib/pgsql/15/data/base" ]; then
-  echo "🔧 Initializing PostgreSQL 15 database..."
-  sudo /usr/pgsql-15/bin/postgresql-15-setup initdb
+  sudo -u postgres /usr/pgsql-15/bin/initdb -D /var/lib/pgsql/15/data
+else
+  echo "✅ PostgreSQL 15 already initialized"
 fi
 
 sudo systemctl enable postgresql-15
