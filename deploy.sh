@@ -21,10 +21,8 @@ bundle install
 echo "📄 Ensuring Puma config file exists..."
 if [ ! -f puma.rb ]; then
   cat > puma.rb <<'EOF'
-port ENV.fetch("PORT") { 9292 }
-environment ENV.fetch("RACK_ENV") { "development" }
-daemonize true
-stdout_redirect 'puma.log', 'puma_err.log', true
+    port ENV.fetch("PORT") { 9292 }
+    environment ENV.fetch("RACK_ENV") { "development" }
 EOF
   echo "✅ Created puma.rb"
 else
@@ -33,7 +31,8 @@ fi
 
 echo "🚀 Starting Puma (daemon mode)..."
 pkill -f puma || true
-bundle exec puma -C puma.rb
+bundle exec puma -C puma.rb --daemon --redirect-stdout puma.log --redirect-stderr puma_err.log
+echo "✅ Puma started. Logs: puma.log, puma_err.log"
 
 echo "🌐 Setting up Nginx reverse proxy..."
 sudo tee /etc/nginx/conf.d/myapp.conf > /dev/null <<EOF
