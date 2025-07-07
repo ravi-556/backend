@@ -10,11 +10,13 @@ sudo dnf install -y ruby ruby-devel gcc make redhat-rpm-config \
 
 echo "💎 Installing bundler..."
 if ! command -v bundle &> /dev/null; then
-  gem install bundler --path vendor/bundle
+  sudo gem install bundler
 fi
 
-echo "📁 Installing Ruby gems..."
+echo "📁 Installing Ruby gems to vendor/bundle (project local)..."
+export BUNDLE_PATH=vendor/bundle
 bundle install
+
 
 PGDATA_DIR="/var/lib/pgsql/15/data"
 
