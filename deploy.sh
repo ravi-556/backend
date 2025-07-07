@@ -17,15 +17,55 @@ echo "📁 Installing Ruby gems to vendor/bundle..."
 bundle config set --local path 'vendor/bundle'
 bundle install
 
+
+echo "📄 Ensuring Puma config file exists..."
+if [ ! -f puma.rb ]; then
+  cat > puma.rb <<'EOF'
+port ENV.fetch("PORT") { 9292 }
+environment ENV.fetch("RACK_ENV") { "development" }
+daemonize true
+stdout_redirect 'puma.log', 'puma_err.log', true
+EOF
+  echo "✅ Created puma.rb"
+else
+  echo "✅ puma.rb already exists"
+fi
+
+echo "🚀 Starting Puma (daemon mode)..."
+pkill -f puma || true
+bundle exec puma -C puma.rb
+
+echo "🌐 Setting up Nginx reverse proxy..."
+sudo tee /etc/nginx/conf.d/myapp.conf > /dev/null <<EOF
+server {
+    listen 80;
+    server_name localhost;
+
+    location / {
+        proxy_pass http://localhost:9292;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+
+sudo rm -f /etc/nginx/conf.d/default.conf || true
+sudo nginx -t && sudo systemctl enable nginx && sudo systemctl restart nginx
+
 PGDATA_DIR="/var/lib/pgsql/15/data"
 
-echo "🚀 Initializing PostgreSQL 15..."
 if [ ! -f "$PGDATA_DIR/PG_VERSION" ]; then
-  echo "📂 Running initdb as postgres user"
+  echo "📂 Initializing PostgreSQL..."
   cd /tmp
-  sudo -u postgres /usr/bin/initdb -D "$PGDATA_DIR"
+  if sudo -u postgres /usr/bin/initdb -D "$PGDATA_DIR"; then
+    echo "✅ PostgreSQL initialized"
+  else
+    echo "⚠️  PostgreSQL initdb failed (possibly already initialized or partially set up)"
+  fi
 else
-  echo "✅ PostgreSQL data directory already initialized"
+  echo "✅ PostgreSQL already initialized"
 fi
 
 echo "⚙️ Setting up custom systemd service for PostgreSQL 15..."
@@ -63,41 +103,6 @@ else
   echo "✅ Database 'appdb' already exists"
 fi
 
-echo "📄 Ensuring Puma config file exists..."
-if [ ! -f puma.rb ]; then
-  cat > puma.rb <<'EOF'
-port ENV.fetch("PORT") { 9292 }
-environment ENV.fetch("RACK_ENV") { "development" }
-daemonize true
-stdout_redirect 'puma.log', 'puma_err.log', true
-EOF
-  echo "✅ Created puma.rb"
-else
-  echo "✅ puma.rb already exists"
-fi
-
-echo "🚀 Starting Puma (daemon mode)..."
-pkill -f puma || true
-bundle exec puma -C puma.rb
-
-echo "🌐 Setting up Nginx reverse proxy..."
-sudo tee /etc/nginx/conf.d/myapp.conf > /dev/null <<EOF
-server {
-    listen 80;
-    server_name localhost;
-
-    location / {
-        proxy_pass http://localhost:9292;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-}
-EOF
-
-sudo rm -f /etc/nginx/conf.d/default.conf || true
-sudo nginx -t && sudo systemctl enable nginx && sudo systemctl restart nginx
 
 echo "✅ Deployment completed successfully!"
 echo "🔗 Visit: http://<your-ec2-public-ip>"
