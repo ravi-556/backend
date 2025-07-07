@@ -10,7 +10,7 @@ sudo dnf install -y ruby ruby-devel gcc make redhat-rpm-config \
 
 echo "💎 Installing bundler..."
 if ! command -v bundle &> /dev/null; then
-  gem install bundler
+  gem install bundler --path vendor/bundle
 fi
 
 echo "📁 Installing Ruby gems..."
