@@ -103,5 +103,23 @@ else
 fi
 
 
+PGDATA_DIR="/var/lib/pgsql/15/data"
+PG_HBA="$PGDATA_DIR/pg_hba.conf"
+
+echo "🔧 Updating pg_hba.conf to use md5 authentication..."
+
+# Replace 'peer' or 'ident' with 'md5' for local connections
+sudo sed -i 's/^\(local\s\+all\s\+all\s\+\)\(peer\|ident\)/\1md5/' "$PG_HBA"
+
+# You can also ensure md5 is used for host connections
+# Uncomment or add this line if not present:
+if ! grep -q "^host\s\+all\s\+all\s\+127.0.0.1\/32\s\+md5" "$PG_HBA"; then
+  echo "host    all             all             127.0.0.1/32            md5" | sudo tee -a "$PG_HBA" > /dev/null
+fi
+
+echo "🔁 Restarting PostgreSQL to apply auth changes..."
+sudo systemctl restart postgresql15-custom
+
+
 echo "✅ Deployment completed successfully!"
 echo "🔗 Visit: http://<your-ec2-public-ip>"
