@@ -19,9 +19,13 @@ bundle install
 PGDATA_DIR="/var/lib/pgsql/data"
 PG_HBA="$PGDATA_DIR/pg_hba.conf"
 
-echo "🚀 Initializing PostgreSQL 14 if needed..."
-if [ ! -f "$PGDATA_DIR/PG_VERSION" ]; then
+echo "🚀 Ensuring PostgreSQL data directory is initialized..."
+if [ ! -s "$PGDATA_DIR/PG_VERSION" ]; then
+  echo "⚠️  PG_VERSION missing or empty. Reinitializing database cluster..."
+  sudo rm -rf "$PGDATA_DIR"
   sudo /usr/bin/postgresql-setup --initdb
+else
+  echo "✅ PostgreSQL data directory is already initialized."
 fi
 
 echo "🔧 Updating pg_hba.conf to use md5 authentication..."
@@ -41,10 +45,10 @@ else
   echo "✅ PostgreSQL user 'backend' already exists"
 fi
 
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='appdb'" | grep -q 1; then
-  sudo -u postgres psql -c "CREATE DATABASE appdb OWNER backend;"
+if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='user_data'" | grep -q 1; then
+  sudo -u postgres psql -c "CREATE DATABASE user_data OWNER backend;"
 else
-  echo "✅ PostgreSQL database 'appdb' already exists"
+  echo "✅ PostgreSQL database 'user_data' already exists"
 fi
 
 echo "📄 Ensuring Puma config file exists..."
