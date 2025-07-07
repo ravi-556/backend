@@ -1,57 +1,48 @@
 require 'sinatra'
-require 'json'
+require 'sinatra/json'
 require 'sequel'
-require 'pg'
-require 'rack/cors'
+require 'json'
+require 'sinatra/cross_origin'
 
-# Allow CORS for frontend
-use Rack::Cors do
-  allow do
-    origins 'https://mytesting.co.in'  # Replace with your frontend domain
-    resource '*',
-      headers: :any,
-      methods: [:get, :post, :options]
-  end
+configure do
+  enable :cross_origin
 end
 
-set :bind, '0.0.0.0'
-
-# Connect to PostgreSQL
-DB = Sequel.connect('postgres://backend:securepass@localhost/user_data')
-
-# Create table if not exists
-unless DB.table_exists?(:users)
-  DB.create_table :users do
-    primary_key :id
-    String :name
-    String :email
-    DateTime :created_at
-  end
+before do
+  content_type :json
 end
 
-Users = DB[:users]
+DB = Sequel.connect('postgres://backend:securepass@localhost:5432/backend_db')
 
-# Handle preflight OPTIONS (CORS)
-options '*' do
-  200
-end
-
-# Create user
+# POST /users - Create user
 post '/users' do
-  begin
-    data = JSON.parse(request.body.read)
+  data = JSON.parse(request.body.read)
+  user = DB[:users].insert(user_name: data['user_name'], email: data['email'])
+  json message: "User created", id: user
+end
 
-    halt 400, { error: 'Missing name or email' }.to_json unless data['name'] && data['email']
+# POST /posts - Create post
+post '/posts' do
+  data = JSON.parse(request.body.read)
+  post = DB[:posts].insert(
+    post_title: data['post_title'],
+    post_content: data['post_content'],
+    author_name: data['author_name'],
+    published_id: data['published_id'],
+    user_id: data['user_id']
+  )
+  json message: "Post created", id: post
+end
 
-    Users.insert(
-      name: data['name'],
-      email: data['email'],
-      created_at: Time.now
-    )
+# GET /posts - List all posts (summary)
+get '/posts' do
+  posts = DB[:posts].select(:id, :post_title, :author_name).all
+  json posts
+end
 
-    content_type :json
-    { status: 'ok', message: 'User saved' }.to_json
-  rescue JSON::ParserError
-    halt 400, { error: 'Invalid JSON' }.to_json
-  end
+# GET /posts/:id - View post details
+get '/posts/:id' do
+  post = DB[:posts][id: params[:id].to_i]
+  halt 404, json({ error: 'Post not found' }) unless post
+  json post
 end

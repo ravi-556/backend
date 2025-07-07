@@ -1,21 +1,51 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "📦 Updating system packages..."
+echo "📦 Updating packages..."
 sudo dnf update -y
 
-echo "🔧 Installing dependencies: Ruby, PostgreSQL 15, Nginx..."
-sudo dnf install -y ruby ruby-devel gcc make redhat-rpm-config \
-  postgresql15 postgresql15-server postgresql15-devel nginx
+echo "🔧 Installing dependencies: Ruby, PostgreSQL 14, Nginx..."
+sudo dnf install -y ruby ruby-devel gcc make redhat-rpm-config postgresql postgresql-server postgresql-devel nginx
 
 echo "💎 Installing bundler (if not present)..."
 if ! command -v bundle &> /dev/null; then
   sudo gem install bundler
 fi
 
-echo "📁 Installing Ruby gems to vendor/bundle..."
+echo "📁 Installing Ruby gems locally..."
 bundle config set --local path 'vendor/bundle'
 bundle install
+
+PGDATA_DIR="/var/lib/pgsql/data"
+PG_HBA="$PGDATA_DIR/pg_hba.conf"
+
+echo "🚀 Initializing PostgreSQL 14 if needed..."
+if [ ! -f "$PGDATA_DIR/PG_VERSION" ]; then
+  sudo /usr/bin/postgresql-setup --initdb
+fi
+
+echo "🔧 Updating pg_hba.conf to use md5 authentication..."
+sudo sed -i 's/^\(local\s\+all\s\+all\s\+\)\(peer\|ident\|trust\)/\1md5/' "$PG_HBA"
+
+if ! grep -q "^host\s\+all\s\+all\s\+127.0.0.1\/32\s\+md5" "$PG_HBA"; then
+  echo "host    all             all             127.0.0.1/32            md5" | sudo tee -a "$PG_HBA" > /dev/null
+fi
+
+sudo systemctl enable postgresql
+sudo systemctl restart postgresql
+
+echo "🛠️ Creating PostgreSQL user and database if not present..."
+if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='backend'" | grep -q 1; then
+  sudo -u postgres psql -c "CREATE USER backend WITH PASSWORD 'securepass';"
+else
+  echo "✅ PostgreSQL user 'backend' already exists"
+fi
+
+if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='appdb'" | grep -q 1; then
+  sudo -u postgres psql -c "CREATE DATABASE appdb OWNER backend;"
+else
+  echo "✅ PostgreSQL database 'appdb' already exists"
+fi
 
 echo "📄 Ensuring Puma config file exists..."
 if [ ! -f puma.rb ]; then
@@ -28,11 +58,10 @@ else
   echo "✅ puma.rb already exists"
 fi
 
-echo "🚀 Starting Puma in background using nohup..."
+echo "🚀 Starting Puma using nohup in background..."
 pkill -f puma || true
 nohup bundle exec puma -C puma.rb > puma.log 2> puma_err.log &
-echo "✅ Puma started (PID: $!)"
-
+echo "✅ Puma started. Logs: puma.log, puma_err.log"
 
 echo "🌐 Setting up Nginx reverse proxy..."
 sudo tee /etc/nginx/conf.d/myapp.conf > /dev/null <<EOF
@@ -53,73 +82,5 @@ EOF
 sudo rm -f /etc/nginx/conf.d/default.conf || true
 sudo nginx -t && sudo systemctl enable nginx && sudo systemctl restart nginx
 
-PGDATA_DIR="/var/lib/pgsql/15/data"
-
-if [ ! -f "$PGDATA_DIR/PG_VERSION" ]; then
-  echo "📂 Initializing PostgreSQL..."
-  cd /tmp
-  if sudo -u postgres /usr/bin/initdb -D "$PGDATA_DIR"; then
-    echo "✅ PostgreSQL initialized"
-  else
-    echo "⚠️  PostgreSQL initdb failed (possibly already initialized or partially set up)"
-  fi
-else
-  echo "✅ PostgreSQL already initialized"
-fi
-
-echo "⚙️ Setting up custom systemd service for PostgreSQL 15..."
-sudo tee /etc/systemd/system/postgresql15-custom.service > /dev/null <<EOF
-[Unit]
-Description=PostgreSQL 15 Custom Database Server
-After=network.target
-
-[Service]
-Type=forking
-User=postgres
-ExecStart=/usr/bin/pg_ctl -D $PGDATA_DIR -l $PGDATA_DIR/logfile start
-ExecStop=/usr/bin/pg_ctl -D $PGDATA_DIR stop
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reexec
-sudo systemctl daemon-reload
-sudo systemctl enable postgresql15-custom
-sudo systemctl start postgresql15-custom
-
-echo "🛠️ Creating PostgreSQL user and database..."
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='backend'" | grep -q 1; then
-  sudo -u postgres psql -c "CREATE USER backend WITH PASSWORD 'securepass';"
-else
-  echo "✅ User 'backend' already exists"
-fi
-
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='appdb'" | grep -q 1; then
-  sudo -u postgres psql -c "CREATE DATABASE appdb OWNER backend;"
-else
-  echo "✅ Database 'appdb' already exists"
-fi
-
-
-PGDATA_DIR="/var/lib/pgsql/15/data"
-PG_HBA="$PGDATA_DIR/pg_hba.conf"
-
-echo "🔧 Updating pg_hba.conf to use md5 authentication..."
-
-# Replace 'peer' or 'ident' with 'md5' for local connections
-sudo sed -i 's/^\(local\s\+all\s\+all\s\+\)\(peer\|ident\)/\1md5/' "$PG_HBA"
-
-# You can also ensure md5 is used for host connections
-# Uncomment or add this line if not present:
-if ! grep -q "^host\s\+all\s\+all\s\+127.0.0.1\/32\s\+md5" "$PG_HBA"; then
-  echo "host    all             all             127.0.0.1/32            md5" | sudo tee -a "$PG_HBA" > /dev/null
-fi
-
-echo "🔁 Restarting PostgreSQL to apply auth changes..."
-sudo systemctl restart postgresql15-custom
-
-
-echo "✅ Deployment completed successfully!"
+echo "✅ Deployment complete!"
 echo "🔗 Visit: http://<your-ec2-public-ip>"
