@@ -25,11 +25,16 @@ sudo yum install git -y
 
 5) clone repo
 
-```git clone git@github-ravi556:ravi-556/backend.git```
+```
+git clone git@github-ravi556:ravi-556/backend.git
+```
 
 6) give permissions for deploy.sh
-```chmod +x deploy.sh```
+```
+chmod +x deploy.sh
+```
 
-7) run deploy.sh
-```./deploy.sh
+8) run deploy.sh
+```   
+./deploy.sh
 ```
