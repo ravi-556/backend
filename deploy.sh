@@ -24,6 +24,9 @@ echo "💎 Installing app dependencies locally..."
 bundle config set path 'vendor/bundle'
 bundle install
 
+echo "🗄️ Running DB migrations..."
+bundle exec sequel -m db/migrations postgres://backend:securepass@localhost:5432/backend_db
+
 echo "📄 Ensuring Puma config exists..."
 cat > puma.rb <<EOF
 port ENV.fetch("PORT") { 9292 }
