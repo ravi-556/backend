@@ -1,74 +1,50 @@
 #!/bin/bash
-set -euo pipefail
+set -e
 
-echo "📦 Updating packages..."
-sudo dnf update -y
+APP_DIR="/home/ec2-user/backend"
+PGDATA_DIR="/var/lib/pgsql/15/data"
+PG_VERSION_FILE="$PGDATA_DIR/PG_VERSION"
+PG_HBA="$PGDATA_DIR/pg_hba.conf"
+DB_NAME="backend_db"
+DB_USER="backend"
+DB_PASS="securepass"
 
-echo "🔧 Installing dependencies: Ruby, PostgreSQL 14, Nginx..."
-sudo dnf install -y ruby ruby-devel gcc make redhat-rpm-config postgresql postgresql-server postgresql-devel nginx
+echo "📦 Installing dependencies..."
+sudo dnf install -y ruby3.2 ruby3.2-devel gcc make nginx postgresql15 postgresql15-server
 
-echo "💎 Installing bundler (if not present)..."
-if ! command -v bundle &> /dev/null; then
-  sudo gem install bundler
+echo "📂 Setting up PostgreSQL 15..."
+if [ ! -f "$PG_VERSION_FILE" ]; then
+  echo "🔧 Initializing PostgreSQL 15 database..."
+  sudo /usr/pgsql-15/bin/postgresql-15-setup initdb
 fi
 
-echo "📁 Installing Ruby gems locally..."
+echo "🔐 Configuring pg_hba.conf for md5 password authentication..."
+sudo tee "$PG_HBA" > /dev/null <<EOF
+local   all             all                                     trust
+host    all             all             127.0.0.1/32            md5
+host    all             all             ::1/128                 md5
+EOF
+
+echo "🚀 Starting PostgreSQL 15..."
+sudo systemctl enable postgresql-15
+sudo systemctl restart postgresql-15
+
+echo "📊 Creating user and database if they don’t exist..."
+sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER'" | grep -q 1 || \
+  sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';"
+sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || \
+  sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;"
+
+echo "📂 Installing backend gems..."
+cd "$APP_DIR"
 bundle config set --local path 'vendor/bundle'
 bundle install
 
-PGDATA_DIR="/var/lib/pgsql/data"
-PG_HBA="$PGDATA_DIR/pg_hba.conf"
-
-echo "🚀 Ensuring PostgreSQL data directory is initialized..."
-if [ ! -s "$PGDATA_DIR/PG_VERSION" ]; then
-  echo "⚠️  PG_VERSION missing or empty. Reinitializing database cluster..."
-  sudo rm -rf "$PGDATA_DIR"
-  sudo /usr/bin/postgresql-setup --initdb
-else
-  echo "✅ PostgreSQL data directory is already initialized."
-fi
-
-echo "🔧 Updating pg_hba.conf to use md5 authentication..."
-sudo sed -i 's/^\(local\s\+all\s\+all\s\+\)\(peer\|ident\|trust\)/\1md5/' "$PG_HBA"
-
-if ! grep -q "^host\s\+all\s\+all\s\+127.0.0.1\/32\s\+md5" "$PG_HBA"; then
-  echo "host    all             all             127.0.0.1/32            md5" | sudo tee -a "$PG_HBA" > /dev/null
-fi
-
-sudo systemctl enable postgresql
-sudo systemctl restart postgresql
-
-echo "🛠️ Creating PostgreSQL user and database if not present..."
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='backend'" | grep -q 1; then
-  sudo -u postgres psql -c "CREATE USER backend WITH PASSWORD 'securepass';"
-else
-  echo "✅ PostgreSQL user 'backend' already exists"
-fi
-
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='user_data'" | grep -q 1; then
-  sudo -u postgres psql -c "CREATE DATABASE user_data OWNER backend;"
-else
-  echo "✅ PostgreSQL database 'user_data' already exists"
-fi
-
-echo "📄 Ensuring Puma config file exists..."
-if [ ! -f puma.rb ]; then
-  cat > puma.rb <<'EOF'
-port ENV.fetch("PORT") { 9292 }
-environment ENV.fetch("RACK_ENV") { "development" }
-EOF
-  echo "✅ Created puma.rb"
-else
-  echo "✅ puma.rb already exists"
-fi
-
-echo "🚀 Starting Puma using nohup in background..."
-pkill -f puma || true
-nohup bundle exec puma -C puma.rb > puma.log 2> puma_err.log &
-echo "✅ Puma started. Logs: puma.log, puma_err.log"
+echo "🗃️ Running database migrations..."
+./vendor/bundle/ruby*/bin/sequel -m db/migrations postgres://$DB_USER:$DB_PASS@localhost:5432/$DB_NAME
 
 echo "🌐 Setting up Nginx reverse proxy..."
-sudo tee /etc/nginx/conf.d/myapp.conf > /dev/null <<EOF
+sudo tee /etc/nginx/conf.d/backend.conf > /dev/null <<EOF
 server {
     listen 80;
     server_name localhost;
@@ -77,14 +53,26 @@ server {
         proxy_pass http://localhost:9292;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
 EOF
 
-sudo rm -f /etc/nginx/conf.d/default.conf || true
-sudo nginx -t && sudo systemctl enable nginx && sudo systemctl restart nginx
+echo "🔄 Restarting Nginx..."
+sudo systemctl enable nginx
+sudo systemctl restart nginx
+
+echo "🐾 Creating puma.rb if missing..."
+if [ ! -f puma.rb ]; then
+  cat > puma.rb <<'EOF'
+port ENV.fetch("PORT") { 9292 }
+environment ENV.fetch("RACK_ENV") { "development" }
+stdout_redirect 'puma.log', 'puma_err.log', true
+EOF
+  echo "✅ Created puma.rb"
+fi
+
+echo "🚀 Starting Puma using nohup..."
+pkill -f puma || true
+nohup bundle exec puma -C puma.rb > log.out 2>&1 &
 
 echo "✅ Deployment complete!"
-echo "🔗 Visit: http://<your-ec2-public-ip>"
