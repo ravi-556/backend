@@ -1,7 +1,9 @@
 1) copy local ssh private key to server
-```scp -i ~/.ssh/ec2-connector.pem ~/.ssh/id_ed25519_ravi556 ec2-user@<server-public-address>:~/.ssh/```
+```
+scp -i ~/.ssh/ec2-connector.pem ~/.ssh/id_ed25519_ravi556 ec2-user@<server-public-address>:~/.ssh/
+```
 
-2) create config file in .ssh folder and copy this code
+3) create config file in .ssh folder and copy this code
 ```
 Host github-ravi556
     HostName github.com
