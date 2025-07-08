@@ -1,59 +1,66 @@
 #!/bin/bash
 set -e
 
-echo "💡 Updating system packages..."
-sudo dnf update -y
+echo "📦 Installing required packages..."
+sudo dnf install -y ruby ruby-devel gcc make postgresql15 postgresql15-server nginx
 
-echo "📦 Installing dependencies: Ruby, PostgreSQL 15, Nginx, GCC, Make..."
-sudo dnf install -y ruby ruby-devel gcc make postgresql15 postgresql15-server postgresql15-devel nginx
+echo "💎 Installing Bundler..."
+gem install bundler
+
+APP_DIR="/home/ec2-user/backend"
+PGDATA_DIR="/var/lib/pgsql/data"
+DB_USER="backend"
+DB_PASS="securepass"
+DB_NAME="backend_db"
 
 echo "🧹 Cleaning previous PostgreSQL data directory (if exists)..."
-sudo rm -rf /var/lib/pgsql/15/data
+if [ -d "$PGDATA_DIR" ] && [ ! -f "$PGDATA_DIR/PG_VERSION" ]; then
+  sudo rm -rf "$PGDATA_DIR"
+fi
 
 echo "🔧 Initializing PostgreSQL 15..."
-sudo /usr/bin/postgresql-setup --initdb
+if [ ! -f "$PGDATA_DIR/PG_VERSION" ]; then
+  sudo postgresql-setup --initdb
+fi
 
 echo "🔐 Configuring pg_hba.conf for password authentication..."
-PG_HBA="/var/lib/pgsql/15/data/pg_hba.conf"
-sudo sed -i "s/^host.*all.*all.*127.0.0.1\/32.*$/host all all 127.0.0.1\/32 md5/" "$PG_HBA"
-sudo sed -i "s/^host.*all.*all.*::1\/128.*$/host all all ::1\/128 md5/" "$PG_HBA"
+sudo sed -i "s/^host.*all.*all.*127.0.0.1.*ident/host all all 127.0.0.1\/32 md5/" "$PGDATA_DIR/pg_hba.conf"
+sudo sed -i "s/^host.*all.*all.*::1.*ident/host all all ::1\/128 md5/" "$PGDATA_DIR/pg_hba.conf"
 
-echo "🚀 Starting PostgreSQL 15..."
+echo "🚀 Starting PostgreSQL..."
 sudo systemctl enable postgresql
 sudo systemctl start postgresql
-sleep 5
 
-echo "👤 Creating PostgreSQL user and database..."
+echo "🗄️ Creating DB user and database if not exists..."
 sudo -u postgres psql <<EOF
-DO
-\$do\$
+DO \$\$
 BEGIN
-   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'backend') THEN
-      CREATE ROLE backend LOGIN PASSWORD 'securepass';
+   IF NOT EXISTS (SELECT FROM pg_catalog.pg_user WHERE usename = '${DB_USER}') THEN
+      CREATE ROLE ${DB_USER} LOGIN PASSWORD '${DB_PASS}';
    END IF;
 END
-\$do\$;
-
-CREATE DATABASE backend_db OWNER backend;
+\$\$;
+CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};
 EOF
 
 echo "🌐 Starting NGINX..."
 sudo systemctl enable nginx
 sudo systemctl start nginx
 
-echo "💎 Installing bundler and app dependencies..."
-cd /home/ec2-user/backend
-gem install bundler
-bundle config set --local path 'vendor/bundle'
-bundle install
+echo "📂 Navigating to app directory..."
+cd "$APP_DIR"
 
-echo "📄 Ensuring puma.rb exists..."
-cat > puma.rb <<'EOPUMA'
+echo "💎 Installing app dependencies..."
+bundle install --path vendor/bundle
+
+echo "📄 Ensuring Puma config exists..."
+cat > puma.rb <<EOF
 port ENV.fetch("PORT") { 9292 }
 environment ENV.fetch("RACK_ENV") { "development" }
 stdout_redirect 'puma.log', 'puma_err.log', true
-EOPUMA
+EOF
 
-echo "🚀 Starting Puma with nohup..."
-pkill -f puma || true
+echo "🚀 Starting Puma..."
 nohup bundle exec puma -C puma.rb &
+
+echo "✅ Deployment complete."
