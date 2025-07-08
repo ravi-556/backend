@@ -12,10 +12,11 @@ DB_PASS="securepass"
 echo "📦 Installing dependencies..."
 sudo dnf install -y ruby3.2 ruby3.2-devel gcc make nginx postgresql15 postgresql15-server
 
-echo "📂 Setting up PostgreSQL 15..."
-if [ ! -f "$PG_VERSION_FILE" ]; then
+if [ ! -f "$PGDATA_DIR/PG_VERSION" ]; then
   echo "🔧 Initializing PostgreSQL 15 database..."
-  sudo /usr/pgsql-15/bin/postgresql-15-setup initdb
+  sudo /usr/pgsql-15/bin/initdb -D "$PGDATA_DIR"
+else
+  echo "✅ PostgreSQL already initialized at $PGDATA_DIR"
 fi
 
 echo "🔐 Configuring pg_hba.conf for md5 password authentication..."
