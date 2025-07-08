@@ -11,7 +11,7 @@ echo "🧹 Cleaning previous PostgreSQL data directory (if exists)..."
 sudo rm -rf /var/lib/pgsql/15/data
 
 echo "🔧 Initializing PostgreSQL 15..."
-sudo /usr/pgsql-15/bin/initdb -D /var/lib/pgsql/15/data
+sudo /usr/bin/postgresql-setup --initdb
 
 echo "🔐 Configuring pg_hba.conf for password authentication..."
 PG_HBA="/var/lib/pgsql/15/data/pg_hba.conf"
@@ -19,7 +19,8 @@ sudo sed -i "s/^host.*all.*all.*127.0.0.1\/32.*$/host all all 127.0.0.1\/32 md5/
 sudo sed -i "s/^host.*all.*all.*::1\/128.*$/host all all ::1\/128 md5/" "$PG_HBA"
 
 echo "🚀 Starting PostgreSQL 15..."
-sudo /usr/pgsql-15/bin/pg_ctl -D /var/lib/pgsql/15/data -l logfile start
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
 sleep 5
 
 echo "👤 Creating PostgreSQL user and database..."
