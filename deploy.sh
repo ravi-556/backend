@@ -1,69 +1,58 @@
 #!/bin/bash
+set -e
 
-set -euo pipefail
+echo "💡 Updating system packages..."
+sudo dnf update -y
 
-APP_DIR="/home/ec2-user/backend"
-PGDATA_DIR="/var/lib/pgsql/data"
+echo "📦 Installing dependencies: Ruby, PostgreSQL 15, Nginx, GCC, Make..."
+sudo dnf install -y ruby ruby-devel gcc make postgresql15 postgresql15-server postgresql15-devel nginx
 
-log() {
-  echo -e "\n🔧 $1"
-}
+echo "🧹 Cleaning previous PostgreSQL data directory (if exists)..."
+sudo rm -rf /var/lib/pgsql/15/data
 
-log "📦 Updating system and installing dependencies..."
-sudo yum update -y
-sudo yum install -y ruby ruby-devel gcc make git \
-  postgresql postgresql-server postgresql-devel nginx
+echo "🔧 Initializing PostgreSQL 15..."
+sudo /usr/pgsql-15/bin/initdb -D /var/lib/pgsql/15/data
 
-log "🚀 Initializing PostgreSQL if not already..."
-if [ ! -f "$PGDATA_DIR/PG_VERSION" ]; then
-  sudo postgresql-setup initdb
-fi
+echo "🔐 Configuring pg_hba.conf for password authentication..."
+PG_HBA="/var/lib/pgsql/15/data/pg_hba.conf"
+sudo sed -i "s/^host.*all.*all.*127.0.0.1\/32.*$/host all all 127.0.0.1\/32 md5/" "$PG_HBA"
+sudo sed -i "s/^host.*all.*all.*::1\/128.*$/host all all ::1\/128 md5/" "$PG_HBA"
 
-log "🔧 Updating pg_hba.conf for md5 auth..."
-sudo sed -i "s/ident/md5/g" "$PGDATA_DIR/pg_hba.conf"
+echo "🚀 Starting PostgreSQL 15..."
+sudo /usr/pgsql-15/bin/pg_ctl -D /var/lib/pgsql/15/data -l logfile start
+sleep 5
 
-log "🚀 Starting PostgreSQL..."
-sudo systemctl enable postgresql
-sudo systemctl restart postgresql
+echo "👤 Creating PostgreSQL user and database..."
+sudo -u postgres psql <<EOF
+DO
+\$do\$
+BEGIN
+   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'backend') THEN
+      CREATE ROLE backend LOGIN PASSWORD 'securepass';
+   END IF;
+END
+\$do\$;
 
+CREATE DATABASE backend_db OWNER backend;
+EOF
 
-log "🗄️ Creating DB user and DB if not exists..."
-sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='backend'" | grep -q 1 || \
-  sudo -u postgres psql -c "CREATE USER backend WITH PASSWORD 'securepass';"
+echo "🌐 Starting NGINX..."
+sudo systemctl enable nginx
+sudo systemctl start nginx
 
-sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='user_data'" | grep -q 1 || \
-  sudo -u postgres psql -c "CREATE DATABASE user_data OWNER backend;"
-
-log "🔧 Installing RVM and Ruby 3.2..."
-sudo yum install -y curl gpg
-gpg2 --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys \
-  409B6B1796C275462A1703113804BB82D39DC0E3 \
-  7D2BAF1CF37B13E2069D6956105BD0E739499BDB
-
-\curl -sSL https://get.rvm.io | bash -s stable --ruby=3.2.2
-source /etc/profile.d/rvm.sh
-rvm use 3.2.2 --default
-
+echo "💎 Installing bundler and app dependencies..."
+cd /home/ec2-user/backend
 gem install bundler
+bundle config set --local path 'vendor/bundle'
+bundle install
 
-cd "$APP_DIR"
-bundle install --path vendor/bundle
-
-log "📝 Creating Puma config if missing..."
-if [ ! -f puma.rb ]; then
-  cat > puma.rb <<EOF
+echo "📄 Ensuring puma.rb exists..."
+cat > puma.rb <<'EOPUMA'
 port ENV.fetch("PORT") { 9292 }
 environment ENV.fetch("RACK_ENV") { "development" }
 stdout_redirect 'puma.log', 'puma_err.log', true
-EOF
-fi
+EOPUMA
 
-log "🌐 Configuring and starting Nginx..."
-sudo systemctl enable nginx
-sudo systemctl restart nginx
-
-log "🚀 Launching Puma server in background..."
+echo "🚀 Starting Puma with nohup..."
 pkill -f puma || true
 nohup bundle exec puma -C puma.rb &
-
-log "✅ Deployment completed!"
