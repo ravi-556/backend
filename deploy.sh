@@ -4,11 +4,14 @@ set -e
 echo "📦 Installing required packages..."
 sudo dnf install -y ruby ruby-devel gcc make nginx
 
-echo "💎 Installing Bundler..."
-gem install bundler
+echo "💎 Installing Bundler locally (no sudo)..."
+gem install --user-install bundler
+
+# Export GEM_PATH so bundler is found and used from local gems
+export GEM_HOME="$HOME/.gem"
+export PATH="$GEM_HOME/bin:$PATH"
 
 APP_DIR="/home/ec2-user/backend"
-
 
 echo "🌐 Starting NGINX..."
 sudo systemctl enable nginx
@@ -17,8 +20,9 @@ sudo systemctl start nginx
 echo "📂 Navigating to app directory..."
 cd "$APP_DIR"
 
-echo "💎 Installing app dependencies..."
-bundle install --path vendor/bundle
+echo "💎 Installing app dependencies locally..."
+bundle config set path 'vendor/bundle'
+bundle install
 
 echo "📄 Ensuring Puma config exists..."
 cat > puma.rb <<EOF
