@@ -31,12 +31,31 @@ sudo yum install git -y
 git clone git@github-ravi556:ravi-556/backend.git
 ```
 
-6) give permissions for deploy.sh
+6) give permissions for deploy.sh and psql.sh
 ```
 chmod +x deploy.sh
+chmod +x psql.sh
 ```
-
+7) run psql.sh
+   ```
+    ./psql.sh
+   ```
+   
 8) run deploy.sh
 ```   
 ./deploy.sh
 ```
+
+testing installation if no errors
+```
+curl -X POST http://localhost:9292/posts \
+  -H "Content-Type: application/json" \
+  -d '{
+    "post_title": "My First Post",
+    "post_content": "This is the content of the post",
+    "author_name": "ravi",
+    "published_id": "pub-123",
+    "user_id": 1
+  }'
+```
+
