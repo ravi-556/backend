@@ -2,7 +2,7 @@
 set -e
 
 echo "📦 Installing required packages..."
-sudo dnf install -y ruby ruby-devel gcc make nginx
+sudo dnf install -y ruby ruby-devel gcc make nginx postgresql-devel
 
 echo "💎 Installing Bundler locally (no sudo)..."
 gem install --user-install bundler
