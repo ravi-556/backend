@@ -2,6 +2,8 @@ require 'sinatra'
 require 'sequel'
 require 'json'
 require 'sinatra/cross_origin'
+require 'sinatra/json'
+
 
 configure do
   enable :cross_origin

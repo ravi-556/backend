@@ -54,6 +54,7 @@ echo "Creating a new database user and database (Optional)..."
 sudo -i -u postgres psql <<EOF
 CREATE USER backend WITH PASSWORD 'securepass';
 CREATE DATABASE backend_db;
+GRANT ALL ON SCHEMA public TO backend;
 GRANT ALL PRIVILEGES ON DATABASE backend_db TO backend;
 \l
 \q
