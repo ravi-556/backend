@@ -3,6 +3,11 @@ require 'sequel'
 require 'json'
 require 'sinatra/cross_origin'
 require 'sinatra/json'
+require 'rack/protection'
+require 'rack/host_authorization'
+
+# Allow Nginx host header
+use Rack::HostAuthorization, ['api.mytesting.co.in']
 
 
 configure do
