@@ -14,20 +14,21 @@ before do
   content_type :json
 end
 
+set :host_authorization, { permitted_hosts: ["localhost", "http://frontend.mytesting.co.in/", "http://api.mytesting.co.in"] }
+# Replace "your_frontend_domain.com" with the actual domain(s) from which your frontend or clients will access your Sinatra application.
+
 before do
     content_type :json
     response.headers['Access-Control-Allow-Origin'] = '*'  # You can replace '*' with your frontend domain for better security
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    puts "Incoming Request Host: #{request.env['HTTP_HOST']}"
   end
   
 # Preflight response for browser
 options '*' do
     200
 end
-
-set :host_authorization, { permitted_hosts: ["localhost", "http://frontend.mytesting.co.in/", "http://api.mytesting.co.in"] }
-# Replace "your_frontend_domain.com" with the actual domain(s) from which your frontend or clients will access your Sinatra application.
 
 
 DB = Sequel.connect('postgres://backend:securepass@localhost:5432/backend_db')
