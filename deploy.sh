@@ -27,6 +27,15 @@ bundle install
 echo "🗄️ Running DB migrations..."
 bundle exec sequel -m db/migrations postgres://backend:securepass@localhost:5432/backend_db
 
+PORT=9292
+PID=$(lsof -ti tcp:$PORT)
+if [ -n "$PID" ]; then
+  echo "Killing Puma running on port $PORT (PID=$PID)"
+  kill -9 $PID
+else
+  echo "No Puma running on port $PORT"
+fi
+
 echo "📄 Ensuring Puma config exists..."
 cat > puma.rb <<EOF
 port ENV.fetch("PORT") { 9292 }

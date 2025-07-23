@@ -22,7 +22,7 @@ before do
   
 # Preflight response for browser
 options '*' do
-200
+    200
 end
 
 DB = Sequel.connect('postgres://backend:securepass@localhost:5432/backend_db')
