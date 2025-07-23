@@ -5,6 +5,10 @@ require 'sinatra/cross_origin'
 require 'sinatra/json'
 
 
+set :host_authorization, { permitted_hosts: ["localhost", "http://frontend.mytesting.co.in/", "http://api.mytesting.co.in"] }
+# Replace "your_frontend_domain.com" with the actual domain(s) from which your frontend or clients will access your Sinatra application.
+
+
 configure do
   enable :cross_origin
   disable :protection
@@ -13,9 +17,6 @@ end
 before do
   content_type :json
 end
-
-set :host_authorization, { permitted_hosts: ["localhost", "http://frontend.mytesting.co.in/", "http://api.mytesting.co.in"] }
-# Replace "your_frontend_domain.com" with the actual domain(s) from which your frontend or clients will access your Sinatra application.
 
 before do
     content_type :json
