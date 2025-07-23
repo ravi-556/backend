@@ -17,6 +17,11 @@ echo "🌐 Starting NGINX..."
 sudo systemctl enable nginx
 sudo systemctl start nginx
 
+echo "postgres enable and start"
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
+
+
 echo "📂 Navigating to app directory..."
 cd "$APP_DIR"
 
@@ -24,8 +29,17 @@ echo "💎 Installing app dependencies locally..."
 bundle config set path 'vendor/bundle'
 bundle install
 
+echo "🔎 Testing DB connection before running migrations..."
+PGPASSWORD=securepass psql -h localhost -U backend -d backend_db -c '\dt' || {
+  echo "❌ Cannot connect to PostgreSQL. Is the DB and user setup done?";
+  exit 1;
+}
+
 echo "🗄️ Running DB migrations..."
-bundle exec sequel -m db/migrations postgres://backend:securepass@localhost:5432/backend_db
+bundle exec sequel -m db/migrations postgres://backend:securepass@localhost:5432/backend_db || {
+  echo "❌ DB migrations failed. Check your migration files.";
+  exit 1;
+}
 
 PORT=9292
 PID=$(lsof -ti tcp:$PORT)
