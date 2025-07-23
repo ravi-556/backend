@@ -7,6 +7,7 @@ require 'sinatra/json'
 
 configure do
   enable :cross_origin
+  disable :protection
 end
 
 before do
