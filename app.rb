@@ -3,11 +3,6 @@ require 'sequel'
 require 'json'
 require 'sinatra/cross_origin'
 require 'sinatra/json'
-require 'rack/protection'
-require 'rack/host_authorization'
-
-# Allow Nginx host header
-use Rack::HostAuthorization, ['api.mytesting.co.in']
 
 
 configure do
@@ -30,8 +25,6 @@ before do
 options '*' do
     200
 end
-
-set :protection, except: :host
 
 
 DB = Sequel.connect('postgres://backend:securepass@localhost:5432/backend_db')
