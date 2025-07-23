@@ -43,7 +43,13 @@ environment ENV.fetch("RACK_ENV") { "development" }
 stdout_redirect 'puma.log', 'puma_err.log', true
 EOF
 
-echo "🚀 Starting Puma..."
-nohup bundle exec puma -C puma.rb &
+echo "🚀 Starting Puma (logs: puma.log / puma_err.log)..."
+nohup bundle exec puma -C puma.rb >> puma.log 2>> puma_err.log &
 
-echo "✅ Deployment complete."
+sleep 2
+if lsof -i :9292 > /dev/null; then
+  echo "✅ Puma is running on port 9292"
+else
+  echo "❌ Puma failed to start"
+  tail -n 20 puma_err.log
+fi
