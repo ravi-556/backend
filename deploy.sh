@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -x
 
 echo "📦 Installing required packages..."
 sudo dnf install -y ruby ruby-devel gcc make nginx postgresql-devel
@@ -45,7 +46,7 @@ echo "✅ Migrations complete."
 
 PORT=9292
 echo "🔍 Checking if port $PORT is in use..."
-PID=$(lsof -ti tcp:$PORT 2>/dev/null)
+PID=$(ss -ltnp | grep ":9292" | awk '{print $6}' | cut -d',' -f2 | cut -d'=' -f2)
 
 if [ -n "$PID" ]; then
   echo "🔪 Killing Puma running on port $PORT (PID=$PID)"
