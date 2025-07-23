@@ -25,6 +25,9 @@ options '*' do
     200
 end
 
+set :protection, except: :host
+
+
 DB = Sequel.connect('postgres://backend:securepass@localhost:5432/backend_db')
 
 # POST /users - Create user
