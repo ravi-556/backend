@@ -59,3 +59,6 @@ get '/posts/:id' do
   halt 404, json({ error: 'Post not found' }) unless post
   json post
 end
+
+set :bind, '0.0.0.0'
+set :port, 9292
