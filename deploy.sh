@@ -41,14 +41,19 @@ bundle exec sequel -m db/migrations postgres://backend:securepass@localhost:5432
   exit 1;
 }
 
+echo "✅ Migrations complete."
+
 PORT=9292
-PID=$(lsof -ti tcp:$PORT)
+echo "🔍 Checking if port $PORT is in use..."
+PID=$(lsof -ti tcp:$PORT 2>/dev/null)
+
 if [ -n "$PID" ]; then
-  echo "Killing Puma running on port $PORT (PID=$PID)"
+  echo "🔪 Killing Puma running on port $PORT (PID=$PID)"
   kill -9 $PID
 else
-  echo "No Puma running on port $PORT"
+  echo "✅ No Puma process running on port $PORT"
 fi
+
 
 echo "📄 Ensuring Puma config exists..."
 cat > puma.rb <<EOF
