@@ -64,8 +64,8 @@ end
 
 # GET /posts - List all posts (summary)
 get '/posts' do
-  posts = DB[:posts].select(:id, :post_title, :author_name).all
-  json posts
+    posts = DB[:posts].select(:id, :post_title, :post_content, :author_name).all
+    json posts
 end
 
 # GET /health - for health check
