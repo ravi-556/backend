@@ -7,12 +7,16 @@ require 'sinatra/json'
 
 set :host_authorization, {
     permitted_hosts: lambda do |host|
-        [
-          'localhost',
-          '127.0.0.1',
-          'api.mytesting.co.in',
-          'frontend.mytesting.co.in'
-        ].include?(host) || host =~ /\A\d{1,3}(\.\d{1,3}){3}\z/ || host.end_with?('.ec2.internal')
+        allowed = [
+          "localhost",
+          "127.0.0.1",
+          "api.mytesting.co.in",
+          "frontend.mytesting.co.in"
+        ]
+    
+        allowed.include?(host) || 
+        host =~ /\A\d{1,3}(\.\d{1,3}){3}\z/ ||   # matches IPv4 like 172.31.4.240
+        host.end_with?(".ec2.internal")         # matches ALB internal DNS names
       end
   }
 # Replace "your_frontend_domain.com" with the actual domain(s) from which your frontend or clients will access your Sinatra application.
