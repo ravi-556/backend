@@ -9,6 +9,8 @@ use Rack::Protection::HostAuthorization, {
     "127.0.0.1",
     "frontend.mytesting.co.in",
     "api.mytesting.co.in",
+    /ec2\.internal$/,                   # optional: for ALB internal DNS
+    /\A\d{1,3}(\.\d{1,3}){3}\z/           # optional: for IP-based Host headers
     # Add any other specific IP addresses if needed, e.g., "65.2.6.38"
   ]
 }
