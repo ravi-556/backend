@@ -60,6 +60,11 @@ get '/posts' do
   json posts
 end
 
+# GET /health - for health check
+get '/health' do
+    status 200
+end
+
 # GET /posts/:id - View post details
 get '/posts/:id' do
   post = DB[:posts][id: params[:id].to_i]
