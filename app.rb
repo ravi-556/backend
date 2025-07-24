@@ -12,7 +12,7 @@ set :host_authorization, {
       'api.mytesting.co.in',
       'frontend.mytesting.co.in',
       /ec2\.internal$/,                   # optional: for ALB internal DNS
-      /\A\d+\.\d+\.\d+\.\d+\z/            # optional: for IP-based Host headers
+      /\A\d{1,3}(\.\d{1,3}){3}\z/           # optional: for IP-based Host headers
     ]
   }
 # Replace "your_frontend_domain.com" with the actual domain(s) from which your frontend or clients will access your Sinatra application.
