@@ -63,6 +63,7 @@ end
 # GET /health - for health check
 get '/health' do
     status 200
+    'OK'
 end
 
 # GET /posts/:id - View post details
