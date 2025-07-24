@@ -5,6 +5,19 @@ require 'sinatra/cross_origin'
 require 'sinatra/json'
 
 
+set :host_authorization, {
+    permitted_hosts: [
+      'localhost',
+      '127.0.0.1',
+      'api.mytesting.co.in',
+      'frontend.mytesting.co.in',
+      /ec2\.internal$/,                   # optional: for ALB internal DNS
+      /\A\d+\.\d+\.\d+\.\d+\z/            # optional: for IP-based Host headers
+    ]
+  }
+# Replace "your_frontend_domain.com" with the actual domain(s) from which your frontend or clients will access your Sinatra application.
+
+
 configure do
   enable :cross_origin
   disable :protection
